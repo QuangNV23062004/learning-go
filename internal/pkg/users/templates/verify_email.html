@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Verification</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .container {
+      background-color: #f4f4f4;
+      border-radius: 5px;
+      padding: 20px;
+    }
+
+    .button {
+      display: inline-block;
+      padding: 10px 20px;
+      background-color: #007bff;
+      color: #ffffff;
+      text-decoration: none;
+      border-radius: 5px;
+      margin: 20px 0;
+    }
+
+    .footer {
+      margin-top: 20px;
+      font-size: 12px;
+      color: #666;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h2>Welcome to {{.AppName}}!</h2>
+    <p>Hello {{.Username}},</p>
+    <p>Thank you for registering. Please verify your email address by clicking the button below:</p>
+
+    <a href="{{.VerifyLink}}" class="button">Verify Email Address</a>
+
+    <p>Or copy and paste this link into your browser:</p>
+    <p style="word-break: break-all;">{{.VerifyLink}}</p>
+
+    <div class="footer">
+      <p>If you didn't create an account, you can safely ignore this email.</p>
+      <p>This link will expire in {{.ExpiryTime}}.</p>
+    </div>
+  </div>
+</body>
+
+</html>

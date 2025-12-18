@@ -2,6 +2,9 @@ package infrastructure
 
 import (
 	"learning-go/internal/pkg/users/domain"
+	"learning-go/internal/types"
+	"math"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -37,14 +40,16 @@ func (r *UserRepository) Create(user *domain.User) (*domain.User, error) {
 }
 
 func (r *UserRepository) Update(user *domain.User) (*domain.User, error) {
-	user, err := r.FindByID(user.ID, false)
+	checkUser, err := r.FindByID(user.ID, false)
 	if err != nil {
 		return nil, err
 	}
-	if err := r.db.Model(&domain.User{}).Save(user).Error; err != nil {
+
+	*checkUser = *user
+	if err := r.db.Model(&domain.User{}).Where("id = ?", user.ID).Save(checkUser).Error; err != nil {
 		return nil, err
 	}
-	return user, nil
+	return checkUser, nil
 }
 
 func (r *UserRepository) Delete(id string) (bool, error) {
@@ -54,9 +59,9 @@ func (r *UserRepository) Delete(id string) (bool, error) {
 	}
 
 	user.IsDeleted = true
-	user.DeletedAt = "now()"
+	user.DeletedAt = time.Now().Format(time.RFC3339)
 
-	if err := r.db.Model(&domain.User{}).Save(user).Error; err != nil {
+	if err := r.db.Model(&domain.User{}).Where("id = ?", user.ID).Save(user).Error; err != nil {
 		return false, err
 	}
 
@@ -73,7 +78,7 @@ func (r *UserRepository) Restore(id string) (bool, error) {
 	user.IsDeleted = false
 	user.DeletedAt = "null"
 
-	if err := r.db.Model(&domain.User{}).Save(user).Error; err != nil {
+	if err := r.db.Model(&domain.User{}).Where("id = ?", user.ID).Save(user).Error; err != nil {
 		return false, err
 	}
 
@@ -89,6 +94,7 @@ func (r *UserRepository) FindByEmail(email string) (*domain.User, error) {
 	if user.IsDeleted {
 		return nil, gorm.ErrRecordNotFound
 	}
+
 	return user, nil
 }
 
@@ -120,7 +126,7 @@ func (r *UserRepository) HardDelete(id string) (bool, error) {
 }
 
 // parameters should be validated in service layer
-func (r *UserRepository) Paginated(page int, limit int, search string, searchField string, order string, sortBy string, includeDeleted bool) ([]domain.User, error) {
+func (r *UserRepository) Paginated(page int, limit int, search string, searchField string, order string, sortBy string, includeDeleted bool) (*types.Paginated[domain.User], error) {
 
 	var users []domain.User
 	var where *gorm.DB = r.db.Model(&domain.User{})
@@ -135,8 +141,23 @@ func (r *UserRepository) Paginated(page int, limit int, search string, searchFie
 
 	var take = limit
 	var skip = (page - 1) * limit
-	if error := where.Order(sortBy + " " + order).Take(take).Offset(skip).Find(&users).Error; error != nil {
+
+	if error := where.Order(sortBy + " " + order).Offset(skip).Limit(take).Find(&users).Error; error != nil {
 		return nil, error
 	}
-	return users, nil
+
+	var total int64
+	where.Model(&domain.User{}).Count(&total)
+	totalPages := int(math.Ceil(float64(total) / float64(limit)))
+
+	return &types.Paginated[domain.User]{
+		Data:        users,
+		TotalPages:  totalPages,
+		CurrentPage: page,
+		Limit:       limit,
+		Order:       order,
+		SortBy:      sortBy,
+		HasPrevious: page > 1,
+		HasNext:     page < totalPages,
+	}, nil
 }
