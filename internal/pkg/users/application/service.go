@@ -1,28 +1,28 @@
 package application
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"html/template"
 	"learning-go/internal/config"
+	httpError "learning-go/internal/http"
 	"learning-go/internal/pkg/users/domain"
 	"learning-go/internal/pkg/users/dtos"
 	"learning-go/internal/pkg/users/enums"
 	"learning-go/internal/pkg/users/infrastructure"
 	"learning-go/internal/types"
+	"learning-go/internal/utils"
 	"path/filepath"
-	"strconv"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
-	"gopkg.in/gomail.v2"
 	"gorm.io/gorm"
 )
 
 type UserService struct {
-	repo *infrastructure.UserRepository
+	repo            *infrastructure.UserRepository
+	jwtService      *utils.JwtService
+	emailService    *utils.EmailService
+	passwordService *utils.PasswordService
+	serverConfig    *config.ServerConfig
 }
 
 type UserCredentials struct {
@@ -32,95 +32,15 @@ type UserCredentials struct {
 }
 
 // Constructor liked
-func NewUserService(repo *infrastructure.UserRepository) *UserService {
+func NewUserService(repo *infrastructure.UserRepository, JwtService *utils.JwtService, EmailService *utils.EmailService, PasswordService *utils.PasswordService, serverConfig *config.ServerConfig) *UserService {
 	return &UserService{
-		repo: repo,
+		repo:            repo,
+		jwtService:      JwtService,
+		emailService:    EmailService,
+		passwordService: PasswordService,
+
+		serverConfig: serverConfig,
 	}
-}
-
-// Helpers
-func GenerateTokens(claims jwt.MapClaims, key []byte, exp string) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	expDuration, err := time.ParseDuration(exp)
-
-	if err != nil {
-		return "", err
-	}
-
-	claims["exp"] = time.Now().Add(expDuration).Unix()
-
-	tokenString, err := token.SignedString(key)
-	if err != nil {
-		return "", err
-	}
-
-	return tokenString, nil
-}
-
-func HashPassword(password string) (string, error) {
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return "", err
-	}
-	return string(hashedPassword), nil
-}
-
-func SendEmail(to string, subject string, body string) error {
-	m := gomail.NewMessage()
-	m.SetHeader("From", config.GetEnv("MAIL_USERNAME", "example@example.com"))
-	m.SetHeader("To", to)
-	m.SetHeader("Subject", subject)
-	m.SetBody("text/html", body)
-
-	port, _ := strconv.Atoi(config.GetEnv("MAIL_PORT", "587"))
-	d := gomail.NewDialer(
-		config.GetEnv("MAIL_HOST", "smtp.gmail.com"),
-		port,
-		config.GetEnv("MAIL_USERNAME", "example@example.com"),
-		config.GetEnv("MAIL_PASSWORD", "password"),
-	)
-
-	if err := d.DialAndSend(m); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// RenderEmailTemplate renders an HTML email template with the provided data
-func RenderEmailTemplate(templatePath string, data interface{}) (string, error) {
-	// Parse the template file
-	tmpl, err := template.ParseFiles(templatePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse template: %w", err)
-	}
-
-	// Execute the template with data
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("failed to execute template: %w", err)
-	}
-
-	return buf.String(), nil
-}
-
-func parseExp(exp string) int64 {
-	expInt, _ := strconv.ParseInt(exp, 10, 64)
-	return expInt
-}
-
-func VerifyJwtToken(tokenString string, key string) (*jwt.Token, error) {
-	issuer := config.GetEnv("JWT_ISSUER", "my-golang-app")
-	token, err := jwt.ParseWithClaims(tokenString, jwt.MapClaims{}, func(t *jwt.Token) (any, error) {
-		return []byte(key), nil
-	}, jwt.WithIssuer(issuer),
-		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
-
-	if err != nil {
-		return nil, err
-	}
-	return token, nil
 }
 
 // Auth Functions
@@ -130,7 +50,7 @@ func (s *UserService) Register(registerDto dtos.RegisterDto) (*domain.User, erro
 	checkUser, err := s.repo.FindByEmail(registerDto.Email)
 	// If no error, it means user was found - email already exists
 	if err == nil && checkUser != nil {
-		return nil, errors.New("user already exists")
+		return nil, domain.ErrUserAlreadyExists
 	}
 
 	// If error is something other than "record not found", return the error
@@ -139,45 +59,48 @@ func (s *UserService) Register(registerDto dtos.RegisterDto) (*domain.User, erro
 		return nil, err
 	}
 
-	hashedPassword, err := HashPassword(registerDto.Password)
+	// hashedPassword, err := s.passwordService.HashPassword(registerDto.Password)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	user := &domain.User{
+		Email:     registerDto.Email,
+		Password:  registerDto.Password,
+		Username:  registerDto.Username,
+		Birthdate: registerDto.Birthdate,
+	}
+
+	verifyToken, verifyExpiry, err := s.jwtService.GenerateVerifyToken(user)
+
 	if err != nil {
 		return nil, err
 	}
 
-	user := jwt.MapClaims{
-		"iss":       config.GetEnv("JWT_ISSUER", "my-golang-app"),
-		"email":     registerDto.Email,
-		"password":  string(hashedPassword),
-		"username":  registerDto.Username,
-		"birthdate": registerDto.Birthdate,
-	}
+	verifyLink := s.serverConfig.Host + "/auth/verify?token=" + verifyToken
 
-	verifySecret := []byte(config.GetEnv("JWT_VERIFY_SECRET", "5f4dcc3b5aa765d61d8327deb882cf99acd7aa40a1f9c7df48adfaf48c69e4c3203a6a17acc60638a7bdc9103d0a499997180cb8d8"))
-	verifyExpiry := config.GetEnv("JWT_VERIFY_EXPIRY", "30m")
-	verifyToken, err := GenerateTokens(user, verifySecret, verifyExpiry)
-
+	duration, err := time.ParseDuration(verifyExpiry)
 	if err != nil {
 		return nil, err
 	}
-
-	verifyLink := config.GetEnv("SERVER_HOST", "http://localhost:2000") + "/auth/verify?token=" + verifyToken
+	expiresAt := time.Now().Add(duration)
 
 	// Prepare template data
 	templateData := map[string]interface{}{
-		"AppName":    config.GetEnv("APP_NAME", "My Golang App"),
+		"AppName":    s.serverConfig.AppName,
 		"Username":   registerDto.Username,
 		"VerifyLink": verifyLink,
-		"ExpiryTime": verifyExpiry,
+		"ExpiryTime": expiresAt.Format(time.RFC1123),
 	}
 
 	// Render the email template
 	templatePath := filepath.Join("internal", "pkg", "users", "templates", "verify_email.html")
-	emailBody, err := RenderEmailTemplate(templatePath, templateData)
+	emailBody, err := s.emailService.RenderEmailTemplate(templatePath, templateData)
 	if err != nil {
-		return nil, fmt.Errorf("failed to render email template: %w", err)
+		return nil, domain.ErrFailedToRenderHTML
 	}
 
-	err = SendEmail(registerDto.Email, "Email Verification", emailBody)
+	err = s.emailService.SendEmail(registerDto.Email, "Email Verification", emailBody)
 	if err != nil {
 		return nil, err
 	}
@@ -188,26 +111,35 @@ func (s *UserService) Register(registerDto dtos.RegisterDto) (*domain.User, erro
 }
 
 func (s *UserService) VerifyEmail(tokenString string) (*domain.User, error) {
-	verifySecret := (config.GetEnv("JWT_VERIFY_SECRET", "verify_secret_key"))
 
-	token, err := VerifyJwtToken(tokenString, verifySecret)
+	verifyVerificationClaims, err := s.jwtService.VerifyVerificationToken(tokenString)
+	if verifyVerificationClaims == (utils.VerifyEmailClaims{}) {
+		return nil, domain.ErrInvalidVerificationToken
+	}
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("Token verified successfully,", token)
+
+	// fmt.Println("Token verified successfully,", verifyVerificationClaims)
 
 	var email, password, username, birthdate, role string
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		email = claims["email"].(string)
-		password = claims["password"].(string)
-		username = claims["username"].(string)
-		birthdate = claims["birthdate"].(string)
+
+	email = verifyVerificationClaims.Email
+	password = verifyVerificationClaims.Password
+	username = verifyVerificationClaims.Username
+	birthdate = verifyVerificationClaims.Birthdate
+
+	hashedPassword, err := s.passwordService.HashPassword(password)
+	if err != nil {
+		return nil, err
 	}
+
+	role = string(enums.User)
 
 	checkUser, err := s.repo.FindByEmail(email)
 	// If no error, it means user was found - email already exists
 	if err == nil && checkUser != nil {
-		return nil, errors.New("user already verified, you can login now")
+		return nil, domain.ErrUserAlreadyExists
 	}
 
 	// If error is something other than "record not found", return the error
@@ -227,7 +159,7 @@ func (s *UserService) VerifyEmail(tokenString string) (*domain.User, error) {
 
 	newUser := &domain.User{
 		Email:     email,
-		Password:  password,
+		Password:  hashedPassword,
 		Username:  username,
 		Birthdate: birthdate,
 		Role:      role,
@@ -243,32 +175,20 @@ func (s *UserService) VerifyEmail(tokenString string) (*domain.User, error) {
 func (s *UserService) Login(loginDto dtos.LoginDto) (*UserCredentials, error) {
 	user, err := s.repo.FindByEmail(loginDto.Email)
 	if err != nil {
-		return nil, errors.New("invalid email or password")
+		return nil, domain.ErrInvalidCredentials
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginDto.Password))
+	err = s.passwordService.CompareHashAndPassword([]byte(user.Password), []byte(loginDto.Password))
 	if err != nil {
-		return nil, errors.New("invalid email or password")
+		return nil, domain.ErrInvalidCredentials
 	}
 
-	claims := jwt.MapClaims{
-		"iss":  config.GetEnv("JWT_ISSUER", "my-golang-app"),
-		"sub":  user.ID,
-		"role": user.Role,
-	}
-
-	accessSecret := []byte(config.GetEnv("JWT_ACCESS_SECRET", "acd7aa40a1f9c7df48adfaf48c69e4c3203a6a17acc60638a7bdc9103d0a499997180cb8d8"))
-	accessExpiry := config.GetEnv("JWT_ACCESS_EXPIRY", "24h")
-
-	refreshSecret := []byte(config.GetEnv("JWT_REFRESH_SECRET", "8ee21eb52bf23900b62daa6fc7f7b8a09e6548cc8ef5ecc894fa26ff49022b8b8327ba6ce9914b"))
-	refreshExpiry := config.GetEnv("JWT_REFRESH_EXPIRY", "720h")
-
-	accessToken, err := GenerateTokens(claims, accessSecret, accessExpiry)
+	accessToken, err := s.jwtService.GenerateAccessToken(user)
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := GenerateTokens(claims, refreshSecret, refreshExpiry)
+	refreshToken, err := s.jwtService.GenerateRefreshToken(user)
 	if err != nil {
 		return nil, err
 	}
@@ -319,14 +239,14 @@ func (s *UserService) RestoreUser(id string) (bool, error) {
 
 func (s *UserService) DeleteUser(id string, role string, sub string) (bool, error) {
 	if role != string(enums.Admin) && id != sub {
-		return false, errors.New("only admin or owner can delete this account")
+		return false, httpError.ErrForbidden
 	}
 	return s.repo.Delete(id)
 }
 
 func (s *UserService) UpdateUser(id string, userDto dtos.UpdateUserDto, sub string) (*domain.User, error) {
 	if id != sub {
-		return nil, errors.New("you can only update your own profile")
+		return nil, httpError.ErrForbidden
 	}
 
 	user, err := s.repo.FindByID(id, false)
@@ -346,6 +266,14 @@ func (s *UserService) UpdateUser(id string, userDto dtos.UpdateUserDto, sub stri
 
 // admin only
 func (s *UserService) PaginatedUsers(page int, limit int, search string, searchField string, order string, sortBy string, includeDeleted bool) (*types.Paginated[domain.User], error) {
+	allowed := map[string]bool{"email": true, "username": true, "created_at": true}
+	if !allowed[searchField] {
+		searchField = "email"
+	}
+	if !allowed[sortBy] {
+		sortBy = "created_at"
+	}
+
 	data, err := s.repo.Paginated(page, limit, search, searchField, order, sortBy, includeDeleted)
 	if err != nil {
 		return nil, err
@@ -362,49 +290,36 @@ func (s *UserService) PaginatedUsers(page int, limit int, search string, searchF
 }
 
 func (s *UserService) RefreshTokens(refreshTokenString string) (*UserCredentials, error) {
-	refreshSecret := (config.GetEnv("JWT_REFRESH_SECRET", "refresh_secret_key"))
-
-	token, err := VerifyJwtToken(refreshTokenString, refreshSecret)
+	claims, err := s.jwtService.VerifyRefreshToken(refreshTokenString)
 	if err != nil {
 		return nil, err
 	}
 
 	var sub, exp string
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		sub = claims["sub"].(string)
-		exp = fmt.Sprintf("%v", claims["exp"])
-	}
+
+	sub = claims["sub"].(string)
+	exp = fmt.Sprintf("%v", claims["exp"])
 
 	checkUser, err := s.repo.FindByID(sub, false)
 	if checkUser == nil {
-		return nil, errors.New("user not found")
+		return nil, gorm.ErrRecordNotFound
 	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	claims := jwt.MapClaims{
-		"iss":  config.GetEnv("JWT_ISSUER", "my-golang-app"),
-		"sub":  checkUser.ID,
-		"role": checkUser.Role,
-	}
-
-	accessSecret := []byte(config.GetEnv("JWT_ACCESS_SECRET", "acd7aa40a1f9c7df48adfaf48c69e4c3203a6a17acc60638a7bdc9103d0a499997180cb8d8"))
-	accessExpiry := config.GetEnv("JWT_ACCESS_EXPIRY", "24h")
 	var accessToken, refreshToken string
 
-	accessToken, err = GenerateTokens(claims, accessSecret, accessExpiry)
+	accessToken, err = s.jwtService.GenerateAccessToken(checkUser)
 	if err != nil {
 		return nil, err
 	}
 
 	refreshToken = refreshTokenString
 
-	if time.Unix(int64(parseExp(exp)), 0).Sub(time.Now()) < 24*time.Hour {
-		refreshSecret := []byte(config.GetEnv("JWT_REFRESH_SECRET", "8ee21eb52bf23900b62daa6fc7f7b8a09e6548cc8ef5ecc894fa26ff49022b8b8327ba6ce9914b"))
-		refreshExpiry := config.GetEnv("JWT_REFRESH_EXPIRY", "720h")
-		refreshToken, err = GenerateTokens(claims, refreshSecret, refreshExpiry)
+	if time.Unix(int64(s.jwtService.ParseExp(exp)), 0).Sub(time.Now()) < 24*time.Hour {
+		refreshToken, err = s.jwtService.GenerateRefreshToken(checkUser)
 		if err != nil {
 			return nil, err
 		}

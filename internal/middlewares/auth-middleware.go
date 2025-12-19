@@ -1,32 +1,12 @@
 package middlewares
 
 import (
-	"learning-go/internal/config"
+	"learning-go/internal/utils"
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/golang-jwt/jwt/v5"
 )
-
-// helpers
-func VerifyToken(tokenString string) (*jwt.Token, error) {
-	issuer := config.GetEnv("JWT_ISSUER", "")
-	secret := config.GetEnv("JWT_ACCESS_SECRET", "")
-	token, err := jwt.ParseWithClaims(tokenString,
-		jwt.MapClaims{}, func(t *jwt.Token) (any, error) {
-			return []byte(secret), nil
-		},
-		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
-		jwt.WithIssuer(issuer),
-		jwt.WithExpirationRequired(),
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return token, nil
-}
 
 func ExtractToken(c fiber.Ctx) string {
 	token := c.Cookies("accessToken")
@@ -45,42 +25,43 @@ func ExtractToken(c fiber.Ctx) string {
 	return token
 }
 
-func SetClaimsToContext(c fiber.Ctx, token *jwt.Token) {
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		c.Locals("sub", claims["sub"])
-		c.Locals("role", claims["role"])
-	}
+func SetClaimsToContext(c fiber.Ctx, claims jwt.MapClaims) {
+	c.Locals("sub", claims["sub"])
+	c.Locals("role", claims["role"])
 }
 
-func AuthMiddleware(c fiber.Ctx) error {
-	tokenString := ExtractToken(c)
-	isPublic := c.Locals("public")
+func AuthMiddleware(jwtService *utils.JwtService) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		tokenString := ExtractToken(c)
+		isPublic := c.Locals("public").(bool)
 
-	//token not found: public => next, private => unauthorized
-	if tokenString == "" {
-		if isPublic == true {
-			return c.Next()
+		//token not found: public => next, private => unauthorized
+		if tokenString == "" {
+			if isPublic == true {
+				return c.Next()
+			}
+			return c.Status(fiber.StatusUnauthorized).JSON(
+				utils.Error("Missing or invalid token", fiber.StatusUnauthorized),
+			)
 		}
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Missing or invalid token",
-		})
-	}
 
-	token, err := VerifyToken(tokenString)
+		//without checking token valid
+		claims, err := jwtService.VerifyAccessToken(tokenString)
 
-	if err != nil || !token.Valid {
-		if isPublic == true {
-			return c.Next()
+		if err != nil {
+			if isPublic == true {
+				return c.Next()
+			}
+			return c.Status(fiber.StatusUnauthorized).JSON(
+				utils.Error("Invalid token", fiber.StatusUnauthorized),
+			)
+
 		}
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Invalid token",
-		})
 
+		if claims != nil {
+			SetClaimsToContext(c, claims)
+		}
+
+		return c.Next()
 	}
-
-	if token != nil {
-		SetClaimsToContext(c, token)
-	}
-
-	return c.Next()
 }

@@ -3,35 +3,37 @@ package http
 import (
 	"learning-go/internal/middlewares"
 	"learning-go/internal/pkg/users/enums"
+	"learning-go/internal/utils"
 
 	"github.com/gofiber/fiber/v3"
 )
 
 type Router struct {
-	handler *UserHandler
+	handler    *UserHandler
+	jwtService *utils.JwtService
 }
 
-func NewRouter(handler *UserHandler) *Router {
+func NewRouter(handler *UserHandler, jwtService *utils.JwtService) *Router {
 	return &Router{
-		handler: handler,
+		handler:    handler,
+		jwtService: jwtService,
 	}
 }
 
 func (r *Router) SetupRoutes(app fiber.Router) {
 	auth := app.Group("/auth")
 
-	auth.Post("/register", middlewares.MarkPublic, r.handler.Register)
+	auth.Post("/register", middlewares.MarkPublic(), r.handler.Register)
 
-	auth.Post("/login", middlewares.MarkPublic, r.handler.Login)
+	auth.Post("/login", middlewares.MarkPublic(), r.handler.Login)
 
-	auth.Get("/verify", middlewares.MarkPublic, r.handler.VerifyUser)
+	auth.Get("/verify", middlewares.MarkPublic(), r.handler.VerifyUser)
 
-	auth.Use(middlewares.AuthMiddleware)
-	auth.Post("/refresh", r.handler.RefreshToken)
+	auth.Post("/refresh", middlewares.MarkPublic(), r.handler.RefreshToken)
 
 	user := app.Group("/users")
 
-	user.Use(middlewares.AuthMiddleware)
+	user.Use(middlewares.AuthMiddleware(r.jwtService))
 
 	user.Get("/",
 		middlewares.RoleMiddleware([]string{string(enums.Admin)}),

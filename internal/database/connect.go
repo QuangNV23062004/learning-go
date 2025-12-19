@@ -9,14 +9,14 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-func Connect() (db *gorm.DB, err error) {
-	host := config.GetEnv("DB_HOST", "localhost")
-	username := config.GetEnv("DB_USER", "postgres")
-	password := config.GetEnv("DB_PASSWORD", "postgres")
-	dbname := config.GetEnv("DB_NAME", "postgres")
-	port := config.GetEnv("DB_PORT", "5432")
-	ssl := config.GetEnv("DB_SSLMODE", "disable")
-	timezone := config.GetEnv("DB_TIMEZONE", "Asia/Ho_Chi_Minh")
+func Connect(dbConfig *config.DBConfig) (db *gorm.DB, err error) {
+	host := dbConfig.Host
+	username := dbConfig.User
+	password := dbConfig.Password
+	dbname := dbConfig.Name
+	port := string(dbConfig.Port)
+	ssl := dbConfig.SSLMode
+	timezone := dbConfig.Timezone
 
 	dns := "host=" + host + " user=" + username + " password=" + password + " dbname=" + dbname + " port=" + port + " sslmode=" + ssl + " TimeZone=" + timezone
 	db, err = gorm.Open(postgres.Open(dns), &gorm.Config{})

@@ -2,8 +2,10 @@ package http
 
 import (
 	"encoding/json"
+	httpError "learning-go/internal/http"
 	"learning-go/internal/pkg/users/application"
 	"learning-go/internal/pkg/users/dtos"
+	"learning-go/internal/utils"
 
 	"github.com/gofiber/fiber/v3"
 )
@@ -22,103 +24,88 @@ func NewUserHandler(service *application.UserService) *UserHandler {
 func (h *UserHandler) Register(c fiber.Ctx) error {
 	var body dtos.RegisterDto
 	if err := c.Bind().Body(&body); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
+		err := httpError.ErrInvalidBody
+		return err
 	}
 
 	user, err := h.service.Register(body)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return err
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"Data": "Email sent to " + user.Email})
+	return c.Status(fiber.StatusCreated).JSON(utils.Success(
+		"Email sent to "+user.Email, fiber.StatusCreated,
+	))
 }
 
 func (h *UserHandler) Login(c fiber.Ctx) error {
 	var body dtos.LoginDto
 	if err := c.Bind().Body(&body); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
+		err := httpError.ErrInvalidBody
+		return err
 	}
 
 	credentials, err := h.service.Login(body)
 	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return err
 	}
 
 	userJson, err := json.Marshal(credentials.User)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return err
 	}
 
 	c.Cookies("accessToken", credentials.AccessToken)
 	c.Cookies("refreshToken", credentials.RefreshToken)
 	c.Cookies("user", string(userJson))
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"Data": credentials,
-	})
+	return c.Status(fiber.StatusOK).JSON(utils.Success(
+		credentials, fiber.StatusOK,
+	))
 }
 
 func (h *UserHandler) VerifyUser(c fiber.Ctx) error {
 	token := c.Query("token")
 	if token == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Missing token",
-		})
+		err := httpError.ErrUnauthorized
+		return err
 	}
 
 	user, err := h.service.VerifyEmail(token)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return err
 	}
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"Data":    user,
-		"message": "Email verified successfully for user " + user.Email,
-	})
+	return c.Status(fiber.StatusOK).JSON(utils.Success(
+		user, fiber.StatusOK,
+	))
 }
 
 func (h *UserHandler) RefreshToken(c fiber.Ctx) error {
 
 	refreshToken := c.Cookies("refreshToken")
 	if refreshToken == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Missing refresh token",
-		})
+		err := httpError.ErrMissingRefreshToken
+		return err
 	}
 
 	credentials, err := h.service.RefreshTokens(refreshToken)
 	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return err
 	}
 
 	userJson, err := json.Marshal(credentials.User)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return err
 	}
 
 	c.Cookies("accessToken", credentials.AccessToken)
 	c.Cookies("refreshToken", credentials.RefreshToken)
 	c.Cookies("user", string(userJson))
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"Data": credentials,
-	})
+	return c.Status(fiber.StatusOK).JSON(utils.Success(
+		credentials, fiber.StatusOK,
+	))
 }
 
 // Users
@@ -126,28 +113,25 @@ func (h *UserHandler) GetAllUsers(c fiber.Ctx) error {
 	includeDeleted := c.Query("includeDeleted", "false") == "true"
 	users, err := h.service.GetAllUsers(includeDeleted)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return err
 	}
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"Data": users,
-	})
+	return c.Status(fiber.StatusOK).JSON(utils.Success(
+		users, fiber.StatusOK,
+	))
 }
 
 func (h *UserHandler) GetUserByID(c fiber.Ctx) error {
 	id := c.Params("id")
+
 	role := c.Locals("role").(string)
 	includeDeleted := c.Query("includeDeleted", "false") == "true"
 	user, err := h.service.GetUserByID(id, role, includeDeleted)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return err
 	}
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"Data": user,
-	})
+	return c.Status(fiber.StatusOK).JSON(utils.Success(
+		user, fiber.StatusOK,
+	))
 }
 
 func (h *UserHandler) DeleteUser(c fiber.Ctx) error {
@@ -156,26 +140,22 @@ func (h *UserHandler) DeleteUser(c fiber.Ctx) error {
 	sub := c.Locals("sub").(string)
 	deleted, err := h.service.DeleteUser(id, role, sub)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return err
 	}
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"Data": deleted,
-	})
+	return c.Status(fiber.StatusOK).JSON(utils.Success(
+		deleted, fiber.StatusOK,
+	))
 }
 
 func (h *UserHandler) RestoreUser(c fiber.Ctx) error {
 	id := c.Params("id")
 	restored, err := h.service.RestoreUser(id)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return err
 	}
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"Data": restored,
-	})
+	return c.Status(fiber.StatusOK).JSON(utils.Success(
+		restored, fiber.StatusOK,
+	))
 }
 
 func (h *UserHandler) UpdateUser(c fiber.Ctx) error {
@@ -184,28 +164,24 @@ func (h *UserHandler) UpdateUser(c fiber.Ctx) error {
 	var body dtos.UpdateUserDto
 
 	if err := c.Bind().Body(&body); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
+		err := httpError.ErrInvalidBody
+		return err
 	}
 
 	updatedUser, err := h.service.UpdateUser(id, body, sub)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return err
 	}
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"Data": updatedUser,
-	})
+	return c.Status(fiber.StatusOK).JSON(utils.Success(
+		updatedUser, fiber.StatusOK,
+	))
 }
 
 func (h *UserHandler) PaginatedUsers(c fiber.Ctx) error {
 	var query dtos.PaginatedUsersQueryDto
 	if err := c.Bind().Query(&query); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid query parameters",
-		})
+		err := httpError.ErrInvalidQuery
+		return err
 	}
 
 	// Apply defaults
@@ -213,10 +189,10 @@ func (h *UserHandler) PaginatedUsers(c fiber.Ctx) error {
 
 	data, err := h.service.PaginatedUsers(query.Page, query.Limit, query.Search, query.SearchField, query.Order, query.SortBy, query.IncludeDeleted)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return err
 	}
 
-	return c.Status(fiber.StatusOK).JSON(data)
+	return c.Status(fiber.StatusOK).JSON(utils.Success(
+		data, fiber.StatusOK,
+	))
 }
