@@ -33,7 +33,7 @@ func SetClaimsToContext(c fiber.Ctx, claims jwt.MapClaims) {
 func AuthMiddleware(jwtService *utils.JwtService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		tokenString := ExtractToken(c)
-		isPublic := c.Locals("public").(bool)
+		isPublic := c.Locals("public") == true
 
 		//token not found: public => next, private => unauthorized
 		if tokenString == "" {

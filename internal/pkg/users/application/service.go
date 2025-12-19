@@ -209,11 +209,13 @@ func (s *UserService) GetAllUsers(includeDeleted bool) ([]domain.User, error) {
 		return nil, err
 	}
 
-	for i := range users {
-		users[i].Password = ""
+	result := make([]domain.User, len(users))
+	for i, user := range users {
+		result[i] = *user
+		result[i].Password = ""
 	}
 
-	return users, nil
+	return result, nil
 }
 
 // shared between admin and user
@@ -279,14 +281,25 @@ func (s *UserService) PaginatedUsers(page int, limit int, search string, searchF
 		return nil, err
 	}
 
-	data.Data = func(users []domain.User) []domain.User {
-		for i := range users {
-			users[i].Password = ""
-		}
-		return users
-	}(data.Data)
+	// Remove passwords from users
+	users := make([]domain.User, len(data.Data))
+	for i, user := range data.Data {
+		userCopy := *user
+		userCopy.Password = ""
+		users[i] = userCopy
+	}
 
-	return data, nil
+	// Copy all pagination metadata
+	return &types.Paginated[domain.User]{
+		Data:        users,
+		TotalPages:  data.TotalPages,
+		CurrentPage: data.CurrentPage,
+		Limit:       data.Limit,
+		Order:       data.Order,
+		SortBy:      data.SortBy,
+		HasPrevious: data.HasPrevious,
+		HasNext:     data.HasNext,
+	}, nil
 }
 
 func (s *UserService) RefreshTokens(refreshTokenString string) (*UserCredentials, error) {
