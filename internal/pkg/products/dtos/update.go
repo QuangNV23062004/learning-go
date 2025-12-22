@@ -1,6 +1,7 @@
 package dtos
 
-type UpdateUserDto struct {
-	Username  string `json:"username" validate:"required"`
-	Birthdate string `json:"birthdate" validate:"required,datetime=2006-01-02"`
+type UpdateProductDTO struct {
+	Name  string  `json:"name" binding:"ommitempty"`
+	Price float64 `json:"price" binding:"omitempty,gt=0"`
+	Stock int     `json:"stock" binding:"omitempty,gte=0"`
 }

@@ -3,7 +3,10 @@ package main
 import (
 	"learning-go/internal/config"
 	"learning-go/internal/database"
-	"learning-go/internal/pkg/users/transport/http"
+	orderTransport "learning-go/internal/pkg/orders/transport/http"
+	productTransport "learning-go/internal/pkg/products/transport/http"
+	userTransport "learning-go/internal/pkg/users/transport/http"
+
 	"learning-go/internal/types"
 	"log"
 	"strconv"
@@ -11,6 +14,9 @@ import (
 	httpError "learning-go/internal/http"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/compress"
+	"github.com/gofiber/fiber/v3/middleware/cors"
+	"github.com/gofiber/fiber/v3/middleware/helmet"
 	"github.com/joho/godotenv"
 )
 
@@ -27,6 +33,16 @@ func main() {
 				Error:   err.Error(),
 			})
 		}})
+
+	app.Use(helmet.New())
+
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: []string{"http://localhost:3000", config.GetEnv("FRONTEND_URL", "http://localhost:3000")},
+		AllowHeaders: []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+	}))
+
+	app.Use(compress.New())
 
 	//health check route
 	app.Get("/health", func(c fiber.Ctx) error {
@@ -82,7 +98,9 @@ func main() {
 	database.Migrate(db)
 
 	//setup routes
-	http.BootstrapUserRoutes(app, db, &appConfig.JWT_CONFIG, &appConfig.MAIL_CONFIG, &appConfig.SERVER_CONFIG)
+	userTransport.BootstrapUserRoutes(app, db, &appConfig.JWT_CONFIG, &appConfig.MAIL_CONFIG, &appConfig.SERVER_CONFIG)
+	productTransport.BootstrapProductRoutes(app, db, &appConfig.JWT_CONFIG)
+	orderTransport.BootstrapOrderRoutes(app, db, &appConfig.JWT_CONFIG)
 
 	//start server
 	port := appConfig.SERVER_CONFIG.Port

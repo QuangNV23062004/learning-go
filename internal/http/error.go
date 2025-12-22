@@ -2,6 +2,7 @@ package http
 
 import (
 	"errors"
+	productDomain "learning-go/internal/pkg/products/domain"
 	userDomain "learning-go/internal/pkg/users/domain"
 )
 
@@ -28,6 +29,10 @@ func GetStatusCode(err error) int {
 		return 400
 	case errors.Is(err, ErrMissingRefreshToken):
 		return 400
+	case errors.Is(err, productDomain.ErrProductNotFound):
+		return 404
+	case errors.Is(err, productDomain.ErrUserNotFound):
+		return 404
 	default:
 		return 500
 	}

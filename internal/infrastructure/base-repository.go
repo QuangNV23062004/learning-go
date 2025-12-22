@@ -114,7 +114,7 @@ func (r *BaseRepository[T]) HardDelete(id string) (bool, error) {
 }
 
 // parameters should be validated in service layer
-func (r *BaseRepository[T]) Paginated(page, limit int, search, searchField, order, sortBy string, includeDeleted bool) (*types.Paginated[T], error) {
+func (r *BaseRepository[T]) Paginated(page int, limit int, search, searchField, order, sortBy string, includeDeleted bool) (*types.Paginated[T], error) {
 	var entities []T
 	where := r.db.Model(new(T))
 
