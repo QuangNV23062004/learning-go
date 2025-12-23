@@ -11,7 +11,7 @@ import (
 	"learning-go/internal/pkg/users/infrastructure"
 	"learning-go/internal/types"
 	"learning-go/internal/utils"
-	"path/filepath"
+	"log"
 	"time"
 
 	"gorm.io/gorm"
@@ -47,7 +47,7 @@ func NewUserService(repo *infrastructure.UserRepository, JwtService *utils.JwtSe
 func (s *UserService) Register(registerDto dtos.RegisterDto) (*domain.User, error) {
 	// var user = domain.User{}
 
-	checkUser, err := s.repo.FindByEmail(registerDto.Email)
+	checkUser, err := s.repo.FindByEmail(registerDto.Email, nil)
 	// If no error, it means user was found - email already exists
 	if err == nil && checkUser != nil {
 		return nil, domain.ErrUserAlreadyExists
@@ -94,10 +94,10 @@ func (s *UserService) Register(registerDto dtos.RegisterDto) (*domain.User, erro
 	}
 
 	// Render the email template
-	templatePath := filepath.Join("internal", "pkg", "users", "templates", "verify_email.html")
-	emailBody, err := s.emailService.RenderEmailTemplate(templatePath, templateData)
+	emailBody, err := s.emailService.RenderEmailTemplate("verify_email.html", templateData)
 	if err != nil {
-		return nil, domain.ErrFailedToRenderHTML
+		log.Println("Render email failed:", err)
+		return nil, err
 	}
 
 	err = s.emailService.SendEmail(registerDto.Email, "Email Verification", emailBody)
@@ -112,68 +112,83 @@ func (s *UserService) Register(registerDto dtos.RegisterDto) (*domain.User, erro
 
 func (s *UserService) VerifyEmail(tokenString string) (*domain.User, error) {
 
-	verifyVerificationClaims, err := s.jwtService.VerifyVerificationToken(tokenString)
-	if verifyVerificationClaims == (utils.VerifyEmailClaims{}) {
-		return nil, domain.ErrInvalidVerificationToken
-	}
+	var createdUser *domain.User
+
+	db := s.repo.GetDatabase(nil)
+	err := db.Transaction(func(tx *gorm.DB) error {
+
+		verifyVerificationClaims, err := s.jwtService.VerifyVerificationToken(tokenString)
+		if verifyVerificationClaims == (utils.VerifyEmailClaims{}) {
+			return domain.ErrInvalidVerificationToken
+		}
+		if err != nil {
+			return err
+		}
+
+		// fmt.Println("Token verified successfully,", verifyVerificationClaims)
+
+		var email, password, username, birthdate, role string
+
+		email = verifyVerificationClaims.Email
+		password = verifyVerificationClaims.Password
+		username = verifyVerificationClaims.Username
+		birthdate = verifyVerificationClaims.Birthdate
+
+		hashedPassword, err := s.passwordService.HashPassword(password)
+		if err != nil {
+			return err
+		}
+
+		role = string(enums.User)
+
+		checkUser, err := s.repo.FindByEmail(email, nil)
+		// If no error, it means user was found - email already exists
+		if err == nil && checkUser != nil {
+			return domain.ErrUserAlreadyExists
+		}
+
+		// If error is something other than "record not found", return the error
+		// "record not found" is expected for new registrations
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		users, err := s.repo.FindAll(false, nil)
+		if err != nil {
+			return err
+		}
+
+		if len(users) == 0 {
+			role = string(enums.Admin)
+		}
+
+		newUser := &domain.User{
+			Email:     email,
+			Password:  hashedPassword,
+			Username:  username,
+			Birthdate: birthdate,
+			Role:      role,
+		}
+
+		createdUser, err = s.repo.Create(newUser, nil)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
 	if err != nil {
 		return nil, err
 	}
 
-	// fmt.Println("Token verified successfully,", verifyVerificationClaims)
+	createdUser.Password = ""
 
-	var email, password, username, birthdate, role string
-
-	email = verifyVerificationClaims.Email
-	password = verifyVerificationClaims.Password
-	username = verifyVerificationClaims.Username
-	birthdate = verifyVerificationClaims.Birthdate
-
-	hashedPassword, err := s.passwordService.HashPassword(password)
-	if err != nil {
-		return nil, err
-	}
-
-	role = string(enums.User)
-
-	checkUser, err := s.repo.FindByEmail(email)
-	// If no error, it means user was found - email already exists
-	if err == nil && checkUser != nil {
-		return nil, domain.ErrUserAlreadyExists
-	}
-
-	// If error is something other than "record not found", return the error
-	// "record not found" is expected for new registrations
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
-	}
-
-	users, err := s.repo.FindAll(false)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(users) == 0 {
-		role = string(enums.Admin)
-	}
-
-	newUser := &domain.User{
-		Email:     email,
-		Password:  hashedPassword,
-		Username:  username,
-		Birthdate: birthdate,
-		Role:      role,
-	}
-
-	createdUser, err := s.repo.Create(newUser)
-	if err != nil {
-		return nil, err
-	}
 	return createdUser, nil
 }
 
 func (s *UserService) Login(loginDto dtos.LoginDto) (*UserCredentials, error) {
-	user, err := s.repo.FindByEmail(loginDto.Email)
+	user, err := s.repo.FindByEmail(loginDto.Email, nil)
 	if err != nil {
 		return nil, domain.ErrInvalidCredentials
 	}
@@ -204,7 +219,7 @@ func (s *UserService) Login(loginDto dtos.LoginDto) (*UserCredentials, error) {
 
 // only admin can see all users
 func (s *UserService) GetAllUsers(includeDeleted bool) ([]domain.User, error) {
-	users, err := s.repo.FindAll(includeDeleted)
+	users, err := s.repo.FindAll(includeDeleted, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +240,7 @@ func (s *UserService) GetUserByID(id string, role string, includeDeleted bool) (
 		safeIncludeDeleted = includeDeleted
 	}
 
-	user, err := s.repo.FindByID(id, safeIncludeDeleted)
+	user, err := s.repo.FindByID(id, safeIncludeDeleted, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -236,34 +251,104 @@ func (s *UserService) GetUserByID(id string, role string, includeDeleted bool) (
 
 // only admin can restore users
 func (s *UserService) RestoreUser(id string) (bool, error) {
-	return s.repo.Restore(id)
+	var restored bool
+	db := s.repo.GetDatabase(nil)
+
+	err := db.Transaction(func(tx *gorm.DB) error {
+
+		user, err := s.repo.FindByID(id, false, nil)
+		if user == nil {
+			return domain.ErrUserNotFound
+		}
+
+		if err != nil {
+			return err
+		}
+
+		restored, err = s.repo.Restore(id, nil)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	if err != nil {
+		return false, err
+	}
+
+	return restored, nil
 }
 
 func (s *UserService) DeleteUser(id string, role string, sub string) (bool, error) {
-	if role != string(enums.Admin) && id != sub {
-		return false, httpError.ErrForbidden
+
+	var deleted bool
+
+	db := s.repo.GetDatabase(nil)
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if role != string(enums.Admin) && id != sub {
+			return httpError.ErrForbidden
+		}
+
+		user, err := s.repo.FindByID(id, false, nil)
+		if user == nil {
+			return domain.ErrUserNotFound
+		}
+
+		if err != nil {
+			return err
+		}
+
+		var deleteErr error
+		deleted, deleteErr = s.repo.Delete(id, nil)
+		if deleteErr != nil {
+			return deleteErr
+		}
+		return nil
+	})
+
+	if err != nil {
+		return false, err
 	}
-	return s.repo.Delete(id)
+
+	return deleted, nil
 }
 
 func (s *UserService) UpdateUser(id string, userDto dtos.UpdateUserDto, sub string) (*domain.User, error) {
-	if id != sub {
-		return nil, httpError.ErrForbidden
-	}
 
-	user, err := s.repo.FindByID(id, false)
+	var user *domain.User
+
+	db := s.repo.GetDatabase(nil)
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if id != sub {
+			return httpError.ErrForbidden
+		}
+
+		checkUser, err := s.repo.FindByID(id, false, nil)
+		if err != nil {
+			return err
+		}
+		if userDto.Username != "" {
+			checkUser.Username = userDto.Username
+		}
+
+		if userDto.Birthdate != "" {
+			checkUser.Birthdate = userDto.Birthdate
+		}
+
+		user, err = s.repo.Update(checkUser, nil)
+
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
 	if err != nil {
 		return nil, err
-	}
-	if userDto.Username != "" {
-		user.Username = userDto.Username
+
 	}
 
-	if userDto.Birthdate != "" {
-		user.Birthdate = userDto.Birthdate
-	}
-
-	return s.repo.Update(user)
+	return user, nil
 }
 
 // admin only
@@ -276,7 +361,7 @@ func (s *UserService) PaginatedUsers(page int, limit int, search string, searchF
 		sortBy = "created_at"
 	}
 
-	data, err := s.repo.Paginated(page, limit, search, searchField, order, sortBy, includeDeleted)
+	data, err := s.repo.Paginated(page, limit, search, searchField, order, sortBy, includeDeleted, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -313,7 +398,7 @@ func (s *UserService) RefreshTokens(refreshTokenString string) (*UserCredentials
 	sub = claims["sub"].(string)
 	exp = fmt.Sprintf("%v", claims["exp"])
 
-	checkUser, err := s.repo.FindByID(sub, false)
+	checkUser, err := s.repo.FindByID(sub, false, nil)
 	if checkUser == nil {
 		return nil, gorm.ErrRecordNotFound
 	}

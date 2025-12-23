@@ -22,10 +22,11 @@ func NewOrderHandler(service *application.OrderService) *OrderHandler {
 func (h *OrderHandler) FindOrderByID(c fiber.Ctx) error {
 
 	role := c.Locals("role").(string)
+	sub := c.Locals("sub").(string)
 	id := c.Params("id")
 	includeDeleted := c.Query("includeDeleted") == "true"
 
-	order, err := h.service.FindOrderByID(id, includeDeleted, role)
+	order, err := h.service.FindOrderByID(id, includeDeleted, role, sub)
 	if err != nil {
 		return err
 	}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"learning-go/internal/infrastructure"
 	"learning-go/internal/pkg/orders/domain"
+	orderType "learning-go/internal/pkg/orders/types"
 	"learning-go/internal/types"
 	"math"
 
@@ -17,53 +18,80 @@ type OrderRepository struct {
 
 func NewOrderRepository(db *gorm.DB) *OrderRepository {
 	return &OrderRepository{
-		db: db,
+		BaseRepository: infrastructure.NewBaseRepository[*domain.Order](db),
+		db:             db,
 	}
 }
 
-func (r *OrderRepository) FindOrdersByUserIDWithOptions(userID string, includeDeleted bool, options types.OrderOptions) ([]*domain.Order, error) {
-	var orders []*domain.Order
+func (r *OrderRepository) FindOrdersByUserIDWithOptions(id string, includeDeleted bool, options types.OrderOptions) ([]*orderType.OrderResponse, error) {
+	var result []*orderType.OrderResponse
 
-	var where *gorm.DB = r.db.Model(&domain.Order{})
+	where := r.db.Model(&domain.Order{}).Where("orders.user_id = ?", id)
 
 	if !includeDeleted {
-		where = where.Where("is_deleted = ?", false)
+		where = where.Where("orders.is_deleted = ?", false)
 	}
 
-	if options.WithUser == true {
+	selectFields := `
+        orders.*`
+
+	if options.WithUser {
+		selectFields += `, users.username, users.email`
 		where = where.Joins("LEFT JOIN users ON users.id = orders.user_id")
 	}
-
-	if options.WithProduct == true {
+	if options.WithProduct {
+		selectFields += `, products.name AS product_name, products.price AS product_price, products.stock AS product_stock`
 		where = where.Joins("LEFT JOIN products ON products.id = orders.product_id")
 	}
 
-	err := where.Where("user_id = ?", userID).Find(&orders).Error
+	where = where.Select(selectFields)
+
+	err := where.First(&result).Error
 	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, domain.ErrOrderNotFound
+		}
 		return nil, err
 	}
 
-	return orders, nil
+	return result, nil
 }
 
-func (r *OrderRepository) FindOrdersByUserIDPaginatedWithOptions(userID string, page int, limit int, search string, searchField string, order string, sortBy string, includeDeleted bool, options types.OrderOptions) (*types.Paginated[*domain.Order], error) {
-	var orders []*domain.Order
+func (r *OrderRepository) FindOrdersByUserIDPaginatedWithOptions(userID string, page int, limit int, search string, searchField string, order string, sortBy string, includeDeleted bool, options types.OrderOptions) (*types.Paginated[*orderType.OrderResponse], error) {
+	var orders []*orderType.OrderResponse
 
-	where := r.db.Model(&domain.Order{}).Where("user_id = ?", userID)
+	where := r.db.Model(&domain.Order{}).Where("orders.user_id = ?", userID)
 
 	if !includeDeleted {
-		where = where.Where("is_deleted = ?", false)
+		where = where.Where("orders.is_deleted = ?", false)
 	}
+
+	selectFields := `
+        orders.*`
+
+	if options.WithUser {
+		selectFields += `, users.username, users.email`
+		where = where.Joins("LEFT JOIN users ON users.id = orders.user_id")
+	}
+	if options.WithProduct {
+		selectFields += `, products.name AS product_name, products.price AS product_price, products.stock AS product_stock`
+		where = where.Joins("LEFT JOIN products ON products.id = orders.product_id")
+	}
+
+	where = where.Select(selectFields)
+
 	if search != "" && searchField != "" {
 		where = where.Where(searchField+" ILIKE ?", "%"+search+"%")
 	}
 
-	if options.WithUser == true {
-		where = where.Joins("LEFT JOIN users ON users.id = orders.user_id")
+	// Count before pagination
+	var total int64
+	countQuery := r.db.Model(&domain.Order{}).Where("user_id = ?", userID)
+	if !includeDeleted {
+		countQuery = countQuery.Where("is_deleted = ?", false)
 	}
-
-	if options.WithProduct == true {
-		where = where.Joins("LEFT JOIN products ON products.id = orders.product_id")
+	if err := countQuery.Count(&total).Error; err != nil {
+		return nil, err
 	}
 
 	safeSkip := (page - 1) * limit
@@ -73,19 +101,9 @@ func (r *OrderRepository) FindOrdersByUserIDPaginatedWithOptions(userID string, 
 		return nil, err
 	}
 
-	count := where.Model(&domain.Order{}).Where("user_id = ?", userID)
-	if !includeDeleted {
-		count = count.Where("is_deleted = ?", false)
-	}
-	var total int64
-	err = count.Count(&total).Error
-	if err != nil {
-		return nil, err
-	}
+	totalPages := int(math.Ceil(float64(total) / float64(limit)))
 
-	var totalPages int = int(math.Ceil((float64(total)) / float64(limit)))
-
-	return &types.Paginated[*domain.Order]{
+	return &types.Paginated[*orderType.OrderResponse]{
 		Data:        orders,
 		TotalPages:  totalPages,
 		CurrentPage: page,
@@ -97,62 +115,82 @@ func (r *OrderRepository) FindOrdersByUserIDPaginatedWithOptions(userID string, 
 	}, nil
 }
 
-func (r *OrderRepository) FindByIDWithOptions(id string, includeDeleted bool, options types.OrderOptions) (*domain.Order, error) {
-	var order *domain.Order
-	where := r.db.Model(&domain.Order{})
+func (r *OrderRepository) FindByIDWithOptions(id string, includeDeleted bool, options types.OrderOptions) (*orderType.OrderResponse, error) {
+	var order *orderType.OrderResponse
+	where := r.db.Model(&domain.Order{}).Where("orders.id = ?", id)
 	if !includeDeleted {
-		where = where.Where("is_deleted = ?", false)
+		where = where.Where("orders.is_deleted = ?", false)
 	}
 
-	if options.WithUser == true {
+	selectFields := `
+        orders.*`
+
+	if options.WithUser {
+		selectFields += `, users.username, users.email`
 		where = where.Joins("LEFT JOIN users ON users.id = orders.user_id")
 	}
-
-	if options.WithProduct == true {
+	if options.WithProduct {
+		selectFields += `, products.name AS product_name, products.price AS product_price, products.stock AS product_stock`
 		where = where.Joins("LEFT JOIN products ON products.id = orders.product_id")
 	}
 
-	err := where.Where("id = ?", id).First(&order).Error
+	where = where.Select(selectFields)
+
+	err := where.First(&order).Error
 	if err != nil {
 		return nil, err
 	}
+
 	return order, nil
 }
 
-func (r *OrderRepository) PaginatedWithOptions(page int, limit int, search string, searchField string, order string, sortBy string, includeDeleted bool, options types.OrderOptions) (*types.Paginated[*domain.Order], error) {
-	var entities []*domain.Order
+func (r *OrderRepository) PaginatedWithOptions(page int, limit int, search string, searchField string, order string, sortBy string, includeDeleted bool, options types.OrderOptions) (*types.Paginated[*orderType.OrderResponse], error) {
+	var orders []*orderType.OrderResponse
+
 	where := r.db.Model(new(domain.Order))
+
+	if !includeDeleted {
+		where = where.Where("orders.is_deleted = ?", false)
+	}
+
+	selectFields := `
+        orders.*`
+
+	if options.WithUser {
+		selectFields += `, users.username, users.email`
+		where = where.Joins("LEFT JOIN users ON users.id = orders.user_id")
+	}
+	if options.WithProduct {
+		selectFields += `, products.name AS product_name, products.price AS product_price, products.stock AS product_stock`
+		where = where.Joins("LEFT JOIN products ON products.id = orders.product_id")
+	}
+
+	where = where.Select(selectFields)
 
 	if search != "" && searchField != "" {
 		where = where.Where(fmt.Sprintf("%s ILIKE ?", searchField), "%"+search+"%")
 	}
+
+	// Count before pagination
+	var total int64
+	countQuery := r.db.Model(new(domain.Order))
 	if !includeDeleted {
-		where = where.Where("is_deleted = ?", false)
+		countQuery = countQuery.Where("is_deleted = ?", false)
+	}
+	if err := countQuery.Count(&total).Error; err != nil {
+		return nil, err
 	}
 
-	take := limit
 	skip := (page - 1) * limit
 
-	if options.WithUser == true {
-		where = where.Joins("LEFT JOIN users ON users.id = orders.user_id")
-	}
-
-	if options.WithProduct == true {
-		where = where.Joins("LEFT JOIN products ON products.id = orders.product_id")
-	}
-
-	if err := where.Order(sortBy + " " + order).Offset(skip).Limit(take).Find(&entities).Error; err != nil {
+	if err := where.Order(sortBy + " " + order).Offset(skip).Limit(limit).Find(&orders).Error; err != nil {
 		return nil, err
 	}
 
-	var total int64
-	if err := where.Count(&total).Error; err != nil {
-		return nil, err
-	}
 	totalPages := int(math.Ceil(float64(total) / float64(limit)))
 
-	return &types.Paginated[*domain.Order]{
-		Data:        entities,
+	return &types.Paginated[*orderType.OrderResponse]{
+		Data:        orders,
 		TotalPages:  totalPages,
 		CurrentPage: page,
 		Limit:       limit,
@@ -163,23 +201,29 @@ func (r *OrderRepository) PaginatedWithOptions(page int, limit int, search strin
 	}, nil
 }
 
-func (r *OrderRepository) FindAllWithOptions(includeDeleted bool, options types.OrderOptions) ([]*domain.Order, error) {
-	var entities []*domain.Order
+func (r *OrderRepository) FindAllWithOptions(includeDeleted bool, options types.OrderOptions) ([]*orderType.OrderResponse, error) {
+	var orders []*orderType.OrderResponse
 	where := r.db.Model(new(domain.Order))
 	if !includeDeleted {
-		where = where.Where("is_deleted = ?", false)
+		where = where.Where("orders.is_deleted = ?", false)
 	}
 
-	if options.WithUser == true {
+	selectFields := `
+        orders.*`
+
+	if options.WithUser {
+		selectFields += `, users.username, users.email`
 		where = where.Joins("LEFT JOIN users ON users.id = orders.user_id")
 	}
-
-	if options.WithProduct == true {
+	if options.WithProduct {
+		selectFields += `, products.name AS product_name, products.price AS product_price, products.stock AS product_stock`
 		where = where.Joins("LEFT JOIN products ON products.id = orders.product_id")
 	}
 
-	if err := where.Find(&entities).Error; err != nil {
+	where = where.Select(selectFields)
+
+	if err := where.Find(&orders).Error; err != nil {
 		return nil, err
 	}
-	return entities, nil
+	return orders, nil
 }

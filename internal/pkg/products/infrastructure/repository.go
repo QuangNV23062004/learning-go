@@ -21,10 +21,10 @@ func NewProductRepository(db *gorm.DB) *ProductRepository {
 	}
 }
 
-func (r *ProductRepository) FindAllByUserID(userID string, includeDeleted bool) ([]*domain.Product, error) {
+func (r *ProductRepository) FindAllByUserID(userID string, includeDeleted bool, tx *gorm.DB) ([]*domain.Product, error) {
 	var products []*domain.Product
 
-	var where *gorm.DB = r.db
+	var where *gorm.DB = r.GetDatabase(tx)
 	if !includeDeleted {
 		where = where.Where("is_deleted = ?", false)
 	}
@@ -36,10 +36,10 @@ func (r *ProductRepository) FindAllByUserID(userID string, includeDeleted bool) 
 	return products, nil
 }
 
-func (r *ProductRepository) PaginatedByUserId(userID string, page int, limit int, search, searchField, order, sortBy string, includeDeleted bool) (*types.Paginated[domain.Product], error) {
+func (r *ProductRepository) PaginatedByUserId(userID string, page int, limit int, search, searchField, order, sortBy string, includeDeleted bool, tx *gorm.DB) (*types.Paginated[domain.Product], error) {
 	var products []domain.Product
 
-	where := r.db.Model(&domain.Product{}).Where("user_id = ?", userID)
+	where := r.GetDatabase(tx).Model(&domain.Product{}).Where("user_id = ?", userID)
 	if !includeDeleted {
 		where = where.Where("is_deleted = ?", false)
 	}

@@ -22,9 +22,18 @@ func NewBaseRepository[T BaseModel](db *gorm.DB) *BaseRepository[T] {
 	return &BaseRepository[T]{db: db}
 }
 
-func (r *BaseRepository[T]) FindByID(id string, includeDeleted bool) (T, error) {
+func (r *BaseRepository[T]) GetDatabase(tx *gorm.DB) *gorm.DB {
+	if tx == nil {
+		return r.db
+	}
+	return tx
+}
+func (r *BaseRepository[T]) FindByID(id string, includeDeleted bool, tx *gorm.DB) (T, error) {
 	var entity T
-	if err := r.db.Where("id = ?", id).First(&entity).Error; err != nil {
+
+	db := r.GetDatabase(tx)
+
+	if err := db.Where("id = ?", id).First(&entity).Error; err != nil {
 		var zero T
 		return zero, err
 	}
@@ -35,33 +44,36 @@ func (r *BaseRepository[T]) FindByID(id string, includeDeleted bool) (T, error) 
 	return entity, nil
 }
 
-func (r *BaseRepository[T]) Create(entity T) (T, error) {
-	if err := r.db.Create(&entity).Error; err != nil {
+func (r *BaseRepository[T]) Create(entity T, tx *gorm.DB) (T, error) {
+	db := r.GetDatabase(tx)
+
+	if err := db.Create(&entity).Error; err != nil {
 		var zero T
 		return zero, err
 	}
 	return entity, nil
 }
 
-func (r *BaseRepository[T]) Update(entity T) (T, error) {
+func (r *BaseRepository[T]) Update(entity T, tx *gorm.DB) (T, error) {
+	db := r.GetDatabase(tx)
 	be := entity.GetBaseEntity()
 	if be == nil {
 		var zero T
 		return zero, fmt.Errorf("missing base entity")
 	}
-	if _, err := r.FindByID(be.ID, false); err != nil {
+	if _, err := r.FindByID(be.ID, false, tx); err != nil {
 		var zero T
 		return zero, err
 	}
-	if err := r.db.Model(&entity).Where("id = ?", be.ID).Updates(&entity).Error; err != nil {
+	if err := db.Model(&entity).Where("id = ?", be.ID).Save(&entity).Error; err != nil {
 		var zero T
 		return zero, err
 	}
 	return entity, nil
 }
 
-func (r *BaseRepository[T]) Delete(id string) (bool, error) {
-	entity, err := r.FindByID(id, false)
+func (r *BaseRepository[T]) Delete(id string, tx *gorm.DB) (bool, error) {
+	entity, err := r.FindByID(id, false, tx)
 	if err != nil {
 		return false, err
 	}
@@ -69,30 +81,32 @@ func (r *BaseRepository[T]) Delete(id string) (bool, error) {
 		be.IsDeleted = true
 		be.DeletedAt = time.Now().Format(time.RFC3339)
 	}
-	if err := r.db.Model(&entity).Where("id = ?", id).Save(&entity).Error; err != nil {
+	db := r.GetDatabase(tx)
+	if err := db.Model(&entity).Where("id = ?", id).Save(&entity).Error; err != nil {
 		return false, err
 	}
 	return true, nil
 }
 
-func (r *BaseRepository[T]) Restore(id string) (bool, error) {
-	entity, err := r.FindByID(id, true)
+func (r *BaseRepository[T]) Restore(id string, tx *gorm.DB) (bool, error) {
+	entity, err := r.FindByID(id, true, tx)
 	if err != nil {
 		return false, err
 	}
+	db := r.GetDatabase(tx)
 	if be := entity.GetBaseEntity(); be != nil {
 		be.IsDeleted = false
 		be.DeletedAt = ""
 	}
-	if err := r.db.Model(&entity).Where("id = ?", id).Save(&entity).Error; err != nil {
+	if err := db.Model(&entity).Where("id = ?", id).Save(&entity).Error; err != nil {
 		return false, err
 	}
 	return true, nil
 }
 
-func (r *BaseRepository[T]) FindAll(includeDeleted bool) ([]T, error) {
+func (r *BaseRepository[T]) FindAll(includeDeleted bool, tx *gorm.DB) ([]T, error) {
 	var entities []T
-	where := r.db.Model(new(T))
+	where := r.GetDatabase(tx).Model(new(T))
 	if !includeDeleted {
 		where = where.Where("is_deleted = ?", false)
 	}
@@ -102,21 +116,22 @@ func (r *BaseRepository[T]) FindAll(includeDeleted bool) ([]T, error) {
 	return entities, nil
 }
 
-func (r *BaseRepository[T]) HardDelete(id string) (bool, error) {
-	entity, err := r.FindByID(id, true)
+func (r *BaseRepository[T]) HardDelete(id string, tx *gorm.DB) (bool, error) {
+	entity, err := r.FindByID(id, true, tx)
 	if err != nil {
 		return false, err
 	}
-	if err := r.db.Unscoped().Delete(&entity).Error; err != nil {
+	db := r.GetDatabase(tx)
+	if err := db.Unscoped().Delete(&entity).Error; err != nil {
 		return false, err
 	}
 	return true, nil
 }
 
 // parameters should be validated in service layer
-func (r *BaseRepository[T]) Paginated(page int, limit int, search, searchField, order, sortBy string, includeDeleted bool) (*types.Paginated[T], error) {
+func (r *BaseRepository[T]) Paginated(page int, limit int, search, searchField, order, sortBy string, includeDeleted bool, tx *gorm.DB) (*types.Paginated[T], error) {
 	var entities []T
-	where := r.db.Model(new(T))
+	where := r.GetDatabase(tx).Model(new(T))
 
 	if search != "" && searchField != "" {
 		where = where.Where(fmt.Sprintf("%s ILIKE ?", searchField), "%"+search+"%")

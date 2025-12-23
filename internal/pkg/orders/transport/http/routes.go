@@ -24,24 +24,30 @@ func (r *Router) SetupRoutes(appGroup fiber.Router) {
 	ordersGroup := appGroup.Group("/orders")
 	ordersGroup.Use(
 		middlewares.AuthMiddleware(r.jwtService),
-		middlewares.RoleMiddleware([]string{string(enums.Admin), string(enums.User)}))
+	)
 
 	ordersGroup.Get("/:id",
+		middlewares.RoleMiddleware([]string{string(enums.Admin), string(enums.User)}),
 		r.handler.FindOrderByID)
 
 	ordersGroup.Get("/user/:id",
+		middlewares.RoleMiddleware([]string{string(enums.Admin), string(enums.User)}),
 		r.handler.FindOrdersByUserID)
 
 	ordersGroup.Get("/user/:id/paginated",
+		middlewares.RoleMiddleware([]string{string(enums.Admin), string(enums.User)}),
 		r.handler.FindPaginatedOrdersByUserID)
 
 	ordersGroup.Post("/",
+		middlewares.RoleMiddleware([]string{string(enums.Admin), string(enums.User)}),
 		r.handler.CreateOrder)
 
-	ordersGroup.Put("/:id",
+	ordersGroup.Patch("/:id",
+		middlewares.RoleMiddleware([]string{string(enums.Admin), string(enums.User)}),
 		r.handler.UpdateOrder)
 
 	ordersGroup.Delete("/:id",
+		middlewares.RoleMiddleware([]string{string(enums.Admin), string(enums.User)}),
 		r.handler.DeleteOrder)
 
 	ordersGroup.Use(

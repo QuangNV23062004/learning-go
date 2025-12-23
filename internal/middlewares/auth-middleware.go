@@ -1,7 +1,6 @@
 package middlewares
 
 import (
-	"fmt"
 	"learning-go/internal/utils"
 	"strings"
 
@@ -36,7 +35,7 @@ func AuthMiddleware(jwtService *utils.JwtService) fiber.Handler {
 		tokenString := ExtractToken(c)
 		isPublic := c.Locals("public") == true
 
-		fmt.Printf("Is Public: " + fmt.Sprint(isPublic) + "\n")
+		// fmt.Printf("Is Public: " + fmt.Sprint(isPublic) + "\n")
 		//token not found: public => next, private => unauthorized
 		if tokenString == "" {
 			if isPublic == true {

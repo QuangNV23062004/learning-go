@@ -20,9 +20,9 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 	}
 }
 
-func (r *UserRepository) FindByEmail(email string) (*domain.User, error) {
+func (r *UserRepository) FindByEmail(email string, tx *gorm.DB) (*domain.User, error) {
 	user := &domain.User{}
-	if err := r.db.Model(&domain.User{}).Where("email = ?", email).First(user).Error; err != nil {
+	if err := r.GetDatabase(tx).Model(&domain.User{}).Where("email = ?", email).First(user).Error; err != nil {
 		return nil, err
 	}
 
