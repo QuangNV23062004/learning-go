@@ -1,7 +1,7 @@
 package types
 
 import (
-	"learning-go/internal/pkg/orders/domain"
+	"github.com/QuangNV23062004/learning-go/internal/pkg/orders/domain"
 )
 
 type OrderResponse struct {

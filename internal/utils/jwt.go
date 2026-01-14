@@ -1,10 +1,11 @@
 package utils
 
 import (
-	"learning-go/internal/config"
-	"learning-go/internal/pkg/users/domain"
 	"strconv"
 	"time"
+
+	"github.com/QuangNV23062004/learning-go/internal/config"
+	"github.com/QuangNV23062004/learning-go/internal/pkg/users/domain"
 
 	"github.com/golang-jwt/jwt/v5"
 )

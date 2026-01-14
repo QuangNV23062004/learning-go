@@ -1,8 +1,9 @@
 package middlewares
 
 import (
-	"learning-go/internal/utils"
 	"strings"
+
+	"github.com/QuangNV23062004/learning-go/internal/utils"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/golang-jwt/jwt/v5"

@@ -1,12 +1,12 @@
 package http
 
 import (
-	"learning-go/internal/config"
-	"learning-go/internal/pkg/orders/application"
-	"learning-go/internal/pkg/orders/infrastructure"
-	productInfrastructure "learning-go/internal/pkg/products/infrastructure"
-	userInfrastructure "learning-go/internal/pkg/users/infrastructure"
-	"learning-go/internal/utils"
+	"github.com/QuangNV23062004/learning-go/internal/config"
+	"github.com/QuangNV23062004/learning-go/internal/pkg/orders/application"
+	"github.com/QuangNV23062004/learning-go/internal/pkg/orders/infrastructure"
+	productInfrastructure "github.com/QuangNV23062004/learning-go/internal/pkg/products/infrastructure"
+	userInfrastructure "github.com/QuangNV23062004/learning-go/internal/pkg/users/infrastructure"
+	"github.com/QuangNV23062004/learning-go/internal/utils"
 
 	"github.com/gofiber/fiber/v3"
 	"gorm.io/gorm"

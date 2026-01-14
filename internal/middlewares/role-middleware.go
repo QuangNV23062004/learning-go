@@ -1,7 +1,7 @@
 package middlewares
 
 import (
-	"learning-go/internal/utils"
+	"github.com/QuangNV23062004/learning-go/internal/utils"
 
 	"github.com/gofiber/fiber/v3"
 )

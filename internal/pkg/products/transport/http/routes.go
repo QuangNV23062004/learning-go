@@ -1,9 +1,9 @@
 package http
 
 import (
-	"learning-go/internal/middlewares"
-	"learning-go/internal/pkg/users/enums"
-	"learning-go/internal/utils"
+	"github.com/QuangNV23062004/learning-go/internal/middlewares"
+	"github.com/QuangNV23062004/learning-go/internal/pkg/users/enums"
+	"github.com/QuangNV23062004/learning-go/internal/utils"
 
 	"github.com/gofiber/fiber/v3"
 )

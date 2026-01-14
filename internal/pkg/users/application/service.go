@@ -3,16 +3,17 @@ package application
 import (
 	"errors"
 	"fmt"
-	"learning-go/internal/config"
-	httpError "learning-go/internal/http"
-	"learning-go/internal/pkg/users/domain"
-	"learning-go/internal/pkg/users/dtos"
-	"learning-go/internal/pkg/users/enums"
-	"learning-go/internal/pkg/users/infrastructure"
-	"learning-go/internal/types"
-	"learning-go/internal/utils"
 	"log"
 	"time"
+
+	"github.com/QuangNV23062004/learning-go/internal/config"
+	httpError "github.com/QuangNV23062004/learning-go/internal/http"
+	"github.com/QuangNV23062004/learning-go/internal/pkg/users/domain"
+	"github.com/QuangNV23062004/learning-go/internal/pkg/users/dtos"
+	"github.com/QuangNV23062004/learning-go/internal/pkg/users/enums"
+	"github.com/QuangNV23062004/learning-go/internal/pkg/users/infrastructure"
+	"github.com/QuangNV23062004/learning-go/internal/types"
+	"github.com/QuangNV23062004/learning-go/internal/utils"
 
 	"gorm.io/gorm"
 )

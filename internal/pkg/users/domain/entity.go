@@ -1,6 +1,6 @@
 package domain
 
-import "learning-go/internal/domain"
+import "github.com/QuangNV23062004/learning-go/internal/domain"
 
 type User struct {
 	Email     string `json:"email" gorm:"uniqueIndex"`

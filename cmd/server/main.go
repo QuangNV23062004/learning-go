@@ -1,17 +1,18 @@
 package main
 
 import (
-	"learning-go/internal/config"
-	"learning-go/internal/database"
-	orderTransport "learning-go/internal/pkg/orders/transport/http"
-	productTransport "learning-go/internal/pkg/products/transport/http"
-	userTransport "learning-go/internal/pkg/users/transport/http"
+	"github.com/QuangNV23062004/learning-go/internal/config"
+	"github.com/QuangNV23062004/learning-go/internal/database"
+	orderTransport "github.com/QuangNV23062004/learning-go/internal/pkg/orders/transport/http"
+	productTransport "github.com/QuangNV23062004/learning-go/internal/pkg/products/transport/http"
+	userTransport "github.com/QuangNV23062004/learning-go/internal/pkg/users/transport/http"
 
-	"learning-go/internal/types"
 	"log"
 	"strconv"
 
-	httpError "learning-go/internal/http"
+	"github.com/QuangNV23062004/learning-go/internal/types"
+
+	httpError "github.com/QuangNV23062004/learning-go/internal/http"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/compress"
@@ -58,7 +59,7 @@ func main() {
 			Port:     config.GetEnv("DB_PORT", "5432"),
 			User:     config.GetEnv("DB_USER", "postgres"),
 			Password: config.GetEnv("DB_PASSWORD", "postgres"),
-			Name:     config.GetEnv("DB_NAME", "learning-go"),
+			Name:     config.GetEnv("DB_NAME", "github.com/QuangNV23062004/learning-go"),
 			SSLMode:  config.GetEnv("DB_SSLMODE", "disable"),
 			Timezone: config.GetEnv("DB_TIMEZONE", "Asia/Ho_Chi_Minh"),
 		},

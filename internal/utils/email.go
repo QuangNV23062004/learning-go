@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"embed"
 	"fmt"
-	"learning-go/internal/config"
 	"text/template"
+
+	"github.com/QuangNV23062004/learning-go/internal/config"
 
 	"gopkg.in/gomail.v2"
 )

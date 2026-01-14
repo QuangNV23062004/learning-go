@@ -2,11 +2,12 @@ package infrastructure
 
 import (
 	"fmt"
-	"learning-go/internal/infrastructure"
-	"learning-go/internal/pkg/orders/domain"
-	orderType "learning-go/internal/pkg/orders/types"
-	"learning-go/internal/types"
 	"math"
+
+	"github.com/QuangNV23062004/learning-go/internal/infrastructure"
+	"github.com/QuangNV23062004/learning-go/internal/pkg/orders/domain"
+	orderType "github.com/QuangNV23062004/learning-go/internal/pkg/orders/types"
+	"github.com/QuangNV23062004/learning-go/internal/types"
 
 	"gorm.io/gorm"
 )

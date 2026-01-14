@@ -1,8 +1,8 @@
 package infrastructure
 
 import (
-	"learning-go/internal/infrastructure"
-	"learning-go/internal/pkg/users/domain"
+	"github.com/QuangNV23062004/learning-go/internal/infrastructure"
+	"github.com/QuangNV23062004/learning-go/internal/pkg/users/domain"
 
 	"gorm.io/gorm"
 )

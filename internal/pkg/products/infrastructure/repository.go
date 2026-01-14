@@ -1,10 +1,11 @@
 package infrastructure
 
 import (
-	"learning-go/internal/infrastructure"
-	"learning-go/internal/pkg/products/domain"
-	"learning-go/internal/types"
 	"math"
+
+	"github.com/QuangNV23062004/learning-go/internal/infrastructure"
+	"github.com/QuangNV23062004/learning-go/internal/pkg/products/domain"
+	"github.com/QuangNV23062004/learning-go/internal/types"
 
 	"gorm.io/gorm"
 )

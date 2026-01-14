@@ -1,8 +1,9 @@
 package database
 
 import (
-	config "learning-go/internal/config"
 	"log"
+
+	config "github.com/QuangNV23062004/learning-go/internal/config"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

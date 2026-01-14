@@ -1,17 +1,18 @@
 package application
 
 import (
-	"learning-go/internal/pkg/orders/domain"
-	"learning-go/internal/pkg/orders/dtos"
-	"learning-go/internal/pkg/orders/infrastructure"
-	productInfrastructure "learning-go/internal/pkg/products/infrastructure"
-	roleEnums "learning-go/internal/pkg/users/enums"
-	userInfrastructure "learning-go/internal/pkg/users/infrastructure"
-	"learning-go/internal/types"
 	"log"
 
-	orderType "learning-go/internal/pkg/orders/types"
-	productDomain "learning-go/internal/pkg/products/domain"
+	"github.com/QuangNV23062004/learning-go/internal/pkg/orders/domain"
+	"github.com/QuangNV23062004/learning-go/internal/pkg/orders/dtos"
+	"github.com/QuangNV23062004/learning-go/internal/pkg/orders/infrastructure"
+	productInfrastructure "github.com/QuangNV23062004/learning-go/internal/pkg/products/infrastructure"
+	roleEnums "github.com/QuangNV23062004/learning-go/internal/pkg/users/enums"
+	userInfrastructure "github.com/QuangNV23062004/learning-go/internal/pkg/users/infrastructure"
+	"github.com/QuangNV23062004/learning-go/internal/types"
+
+	orderType "github.com/QuangNV23062004/learning-go/internal/pkg/orders/types"
+	productDomain "github.com/QuangNV23062004/learning-go/internal/pkg/products/domain"
 
 	"gorm.io/gorm"
 )

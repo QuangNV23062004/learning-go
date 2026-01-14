@@ -1,10 +1,10 @@
 package http
 
 import (
-	"learning-go/internal/http"
-	"learning-go/internal/pkg/products/application"
-	"learning-go/internal/pkg/products/dtos"
-	"learning-go/internal/utils"
+	"github.com/QuangNV23062004/learning-go/internal/http"
+	"github.com/QuangNV23062004/learning-go/internal/pkg/products/application"
+	"github.com/QuangNV23062004/learning-go/internal/pkg/products/dtos"
+	"github.com/QuangNV23062004/learning-go/internal/utils"
 
 	"github.com/gofiber/fiber/v3"
 )

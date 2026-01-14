@@ -1,4 +1,4 @@
-module learning-go
+module github.com/QuangNV23062004/learning-go
 
 go 1.25.4
 

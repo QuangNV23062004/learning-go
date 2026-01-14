@@ -2,10 +2,11 @@ package infrastructure
 
 import (
 	"fmt"
-	"learning-go/internal/domain"
-	"learning-go/internal/types"
 	"math"
 	"time"
+
+	"github.com/QuangNV23062004/learning-go/internal/domain"
+	"github.com/QuangNV23062004/learning-go/internal/types"
 
 	"gorm.io/gorm"
 )

@@ -2,10 +2,11 @@ package http
 
 import (
 	"encoding/json"
-	httpError "learning-go/internal/http"
-	"learning-go/internal/pkg/users/application"
-	"learning-go/internal/pkg/users/dtos"
-	"learning-go/internal/utils"
+
+	httpError "github.com/QuangNV23062004/learning-go/internal/http"
+	"github.com/QuangNV23062004/learning-go/internal/pkg/users/application"
+	"github.com/QuangNV23062004/learning-go/internal/pkg/users/dtos"
+	"github.com/QuangNV23062004/learning-go/internal/utils"
 
 	"github.com/gofiber/fiber/v3"
 )

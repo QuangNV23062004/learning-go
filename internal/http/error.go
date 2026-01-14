@@ -2,9 +2,10 @@ package http
 
 import (
 	"errors"
-	orderDomain "learning-go/internal/pkg/orders/domain"
-	productDomain "learning-go/internal/pkg/products/domain"
-	userDomain "learning-go/internal/pkg/users/domain"
+
+	orderDomain "github.com/QuangNV23062004/learning-go/internal/pkg/orders/domain"
+	productDomain "github.com/QuangNV23062004/learning-go/internal/pkg/products/domain"
+	userDomain "github.com/QuangNV23062004/learning-go/internal/pkg/users/domain"
 )
 
 // globalish errors

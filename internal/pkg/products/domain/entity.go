@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"learning-go/internal/domain"
+	"github.com/QuangNV23062004/learning-go/internal/domain"
 )
 
 type Product struct {

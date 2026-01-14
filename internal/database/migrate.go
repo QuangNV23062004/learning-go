@@ -1,9 +1,9 @@
 package database
 
 import (
-	order "learning-go/internal/pkg/orders/domain"
-	product "learning-go/internal/pkg/products/domain"
-	user "learning-go/internal/pkg/users/domain"
+	order "github.com/QuangNV23062004/learning-go/internal/pkg/orders/domain"
+	product "github.com/QuangNV23062004/learning-go/internal/pkg/products/domain"
+	user "github.com/QuangNV23062004/learning-go/internal/pkg/users/domain"
 
 	"gorm.io/gorm"
 )
